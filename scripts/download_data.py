@@ -39,35 +39,21 @@ def download(output_dir: Path, year: int, month: int):
     # Setup file paths
     filename = f"lichess_db_standard_rated_{year}-{month_str}"
     compressed_file = month_dir / f"{filename}.pgn.zst"
-    decompressed_file = month_dir / f"{filename}.pgn"
-
-    if decompressed_file.exists():
-        logger.info("Decompressed file already exists at %s", decompressed_file)
-        return
 
     if compressed_file.exists():
-        logger.info("Compressed file already exists, skipping download")
-    else:
-        # Download file
-        url = f"https://database.lichess.org/standard/{filename}.pgn.zst"
-        logger.info("Downloading %s...", url)
+        logger.info(f"Compressed file already exists at {compressed_file}")
+        return
 
-        subprocess.run(
-            ["curl", url, "--output", str(compressed_file)],
-            check=True,
-        )
+    # Download file
+    url = f"https://database.lichess.org/standard/{filename}.pgn.zst"
+    logger.info(f"Downloading {url}...")
 
-    # Decompress
-    logger.info("Decompressing...")
     subprocess.run(
-        ["pzstd", "-d", str(compressed_file)],
+        ["curl", url, "--output", str(compressed_file)],
         check=True,
     )
 
-    # Cleanup compressed file
-    compressed_file.unlink()
-
-    logger.info("Data ready at %s", decompressed_file)
+    logger.info(f"Download complete: {compressed_file}")
 
 
 if __name__ == "__main__":
