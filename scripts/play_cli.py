@@ -6,14 +6,20 @@ import torch
 
 from chess_ai.data.preprocessing import StandardEncoder
 from chess_ai.models.cnn.model import ChessAISmaller
+from chess_ai.models.transformer.model import ChessTransformer
 from chess_ai.ui.base import GameController
 from chess_ai.ui.cli import CliUI
 
 
-def load_model(checkpoint_path: str, device: torch.device) -> ChessAISmaller:
-    model = ChessAISmaller()
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+def load_model(
+    checkpoint_path: Path, model_type: str, device: torch.device
+) -> ChessAISmaller | ChessTransformer:
+    if model_type == "cnn":
+        model = ChessAISmaller()
+    else:
+        model = ChessTransformer()
 
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
@@ -35,7 +41,13 @@ def load_model(checkpoint_path: str, device: torch.device) -> ChessAISmaller:
     default="white",
     help="Color for the human player (white/black)",
 )
-def main(checkpoint_path: Path, player_color: str):
+@click.option(
+    "--model-type",
+    type=click.Choice(["cnn", "transformer"]),
+    default="cnn",
+    help="Model architecture to use",
+)
+def main(checkpoint_path: Path, player_color: str, model_type: str):
     """Play chess against a trained model via command line interface."""
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -43,7 +55,7 @@ def main(checkpoint_path: Path, player_color: str):
 
     # Load model
     print("Loading model...")
-    model = load_model(checkpoint_path, device)
+    model = load_model(checkpoint_path, model_type, device)
     model = model.to(device)
     print("Model loaded successfully!")
 
