@@ -64,6 +64,7 @@ class GameController:
         model: torch.nn.Module,
         encoder,  # Using the encoder protocol from data/preprocessing.py
         device: torch.device,
+        color: chess.Color = chess.WHITE,
     ):
         """Initialize controller.
 
@@ -78,6 +79,7 @@ class GameController:
         self.encoder = encoder
         self.device = device
         self.board = chess.Board()
+        self.color = color
 
     def play_game(self, player_color: chess.Color = chess.WHITE) -> None:
         """Play a full game.
