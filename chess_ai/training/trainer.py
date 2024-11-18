@@ -168,21 +168,23 @@ def calculate_metrics(outputs: Tensor, targets: Tensor) -> dict[str, float]:
         probs = torch.softmax(outputs, dim=1)
 
         # Piece movement accuracy
-        piece_pred = torch.argmax(probs[:, :4800], dim=1)
-        piece_true = targets < 4800
-        metrics["piece_move_acc"] = (
-            (piece_pred == targets[piece_true]).float().mean().item()
-            if piece_true.any()
-            else 0.0
-        )
+        piece_mask = targets < 4800
+        if piece_mask.any():
+            piece_outputs = outputs[piece_mask, :4800]
+            piece_targets = targets[piece_mask]
+            piece_pred = torch.argmax(piece_outputs, dim=1)
+            metrics["piece_move_acc"] = (piece_pred == piece_targets).float().mean().item()
+        else:
+            metrics["piece_move_acc"] = 0.0
 
         # Promotion accuracy
-        prom_pred = torch.argmax(probs[:, 4800:], dim=1)
-        prom_true = targets >= 4800
-        metrics["promotion_acc"] = (
-            (prom_pred == (targets[prom_true] - 4800)).float().mean().item()
-            if prom_true.any()
-            else 0.0
-        )
+        prom_mask = targets >= 4800
+        if prom_mask.any():
+            prom_outputs = outputs[prom_mask, 4800:]
+            prom_targets = targets[prom_mask] - 4800
+            prom_pred = torch.argmax(prom_outputs, dim=1)
+            metrics["promotion_acc"] = (prom_pred == prom_targets).float().mean().item()
+        else:
+            metrics["promotion_acc"] = 0.0
 
         return metrics
