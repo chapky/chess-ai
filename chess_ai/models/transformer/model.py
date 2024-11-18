@@ -96,7 +96,7 @@ class ChessTransformer(nn.Module):
 
         # Process additional parameters
         additional_features = self.additional_embedding(
-            additional_params
+            additional_params.float()
         )  # (batch, d_model)
         additional_features = additional_features.unsqueeze(1)  # (batch, 1, d_model)
 
