@@ -7,10 +7,11 @@ class ChessTransformer(nn.Module):
 
     def __init__(
         self,
-        d_model: int = 256,
-        nhead: int = 8,
-        num_layers: int = 6,
-        dim_feedforward: int = 1024,
+        d_model: int = 16,
+        nhead: int = 4,
+        num_layers: int = 4,
+        dim_feedforward: int = 32,
+        dim_decoder: int = 512,
         dropout: float = 0.1,
     ) -> None:
         """Initialize transformer model.
@@ -20,6 +21,7 @@ class ChessTransformer(nn.Module):
             nhead: Number of attention heads
             num_layers: Number of transformer layers
             dim_feedforward: Dimension of feedforward network
+            dim_decoder: Dimension of decoder network
             dropout: Dropout rate
         """
         super().__init__()
@@ -47,10 +49,10 @@ class ChessTransformer(nn.Module):
 
         # Output layers
         self.move_predictor = nn.Sequential(
-            nn.Linear(d_model * 65, 2048),  # 64 squares + additional features
+            nn.Linear(d_model * 65, dim_decoder),  # 64 squares + additional features
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(2048, 4864),  # Total possible moves
+            nn.Linear(dim_decoder, 4864),  # Total possible moves
         )
 
     def _create_square_mask(self, sz: int) -> torch.Tensor:
