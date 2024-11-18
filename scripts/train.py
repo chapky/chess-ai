@@ -18,7 +18,7 @@ from chess_ai.training.trainer import train_model
 )
 @click.option(
     "--data-path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     required=True,
     help="Path to training data",
 )
@@ -33,12 +33,18 @@ from chess_ai.training.trainer import train_model
 @click.option("--learning-rate", type=float, default=0.001, help="Learning rate")
 @click.option(
     "--save-dir",
-    type=click.Path(),
+    type=click.Path(path_type=Path),
     default="./models",
     help="Directory to save model checkpoints",
 )
 def train(
-    model_type, data_path, rating_range, batch_size, epochs, learning_rate, save_dir
+    model_type: str,
+    data_path: Path,
+    rating_range: str,
+    batch_size: int,
+    epochs: int,
+    learning_rate: float,
+    save_dir: Path,
 ):
     """Train a chess model on Lichess game data."""
 
