@@ -47,128 +47,6 @@ def tensor_to_board(tensor: Tensor) -> chess.Board:
     return board
 
 
-def tensor_to_move(tensor: Tensor, color: bool) -> chess.Move | None:
-    """Convert a move tensor back to a chess.Move."""
-    tensor_8_8_76_form = tensor.view(8, 8, 76)
-
-    def info_to_move(
-        from_square: int, to_square: int, promotion: int | None = None
-    ) -> chess.Move:
-        move = chess.Move(from_square, to_square)
-        if promotion:
-            move.promotion = promotion
-        return move
-
-    for row in range(8):
-        for col in range(8):
-            # Promotion moves
-            for i in range(64, 67):  # Knight promotions
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(
-                        col - 65 + i, row + 1 if color == chess.WHITE else row - 1
-                    )
-                    return info_to_move(chess.square(col, row), to_square, chess.KNIGHT)
-
-            for i in range(67, 70):  # Rook promotions
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(
-                        col - 68 + i, row + 1 if color == chess.WHITE else row - 1
-                    )
-                    return info_to_move(chess.square(col, row), to_square, chess.ROOK)
-
-            for i in range(70, 73):  # Bishop promotions
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(
-                        col - 71 + i, row + 1 if color == chess.WHITE else row - 1
-                    )
-                    return info_to_move(chess.square(col, row), to_square, chess.BISHOP)
-
-            for i in range(73, 76):  # Queen promotions
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(
-                        col - 74 + i, row + 1 if color == chess.WHITE else row - 1
-                    )
-                    return info_to_move(chess.square(col, row), to_square, chess.QUEEN)
-
-            # Regular moves
-            # Diagonal moves
-            for i in range(7, 56, 8):  # Up-right diagonal
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col + i // 8 + 1, row + i // 8 + 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(3, 52, 8):  # Down-left diagonal
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col - i // 8 - 1, row - i // 8 - 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(1, 50, 8):  # Up-left diagonal
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col - i // 8 - 1, row + i // 8 + 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(5, 54, 8):  # Down-right diagonal
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col + i // 8 + 1, row - i // 8 - 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            # Straight moves
-            for i in range(6, 55, 8):  # Right
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col + i // 8 + 1, row)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(2, 51, 8):  # Left
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col - i // 8 - 1, row)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(0, 49, 8):  # Up
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col, row + i // 8 + 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            for i in range(4, 53, 8):  # Down
-                if tensor_8_8_76_form[row][col][i]:
-                    to_square = chess.square(col, row - i // 8 - 1)
-                    return info_to_move(chess.square(col, row), to_square)
-
-            # Knight moves
-            if tensor_8_8_76_form[row][col][56]:  # Up 2, Left 1
-                to_square = chess.square(col - 1, row + 2)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][57]:  # Up 1, Left 2
-                to_square = chess.square(col - 2, row + 1)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][58]:  # Down 1, Left 2
-                to_square = chess.square(col - 2, row - 1)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][59]:  # Down 2, Left 1
-                to_square = chess.square(col - 1, row - 2)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][60]:  # Down 2, Right 1
-                to_square = chess.square(col + 1, row - 2)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][61]:  # Down 1, Right 2
-                to_square = chess.square(col + 2, row - 1)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][62]:  # Up 1, Right 2
-                to_square = chess.square(col + 2, row + 1)
-                return info_to_move(chess.square(col, row), to_square)
-
-            if tensor_8_8_76_form[row][col][63]:  # Up 2, Right 1
-                to_square = chess.square(col + 1, row + 2)
-                return info_to_move(chess.square(col, row), to_square)
-
-    return None
-
-
 class EloRange:
     """Handles ELO rating ranges for dataset filtering."""
 
@@ -206,3 +84,110 @@ class EloRange:
         """
         idx = cls.RANGES.index(base_rating)
         return 4000 * cls.MULTIPLIERS[idx]
+
+
+def decode_move_index(index: int, color: chess.Color) -> chess.Move:
+    """Convert a move index back to a chess move.
+
+    Args:
+        index: Move index from model output (0-4863)
+        color: Color of the moving piece (for promotion direction)
+
+    Returns:
+        Corresponding chess move.
+
+    Raises:
+        ValueError: If the move index results in an invalid move.
+    """
+    # Get source square coordinates
+    from_row = index // (8 * 76)  # Each square has 76 possible moves
+    from_col = (index % (8 * 76)) // 76
+
+    # Ensure the source square is within bounds
+    if not (0 <= from_row < 8 and 0 <= from_col < 8):
+        raise ValueError("Invalid source square: out of bounds")
+
+    from_square = chess.square(from_col, from_row)
+    move_type = index % 76
+
+    # Handle queen moves (first 56 indices)
+    if move_type < 56:
+        direction = move_type % 8  # 8 possible directions
+        distance = move_type // 8 + 1  # 1-7 squares in each direction
+
+        # Destination square calculation
+        if direction == 0:  # North
+            to_col = from_col
+            to_row = from_row + distance
+        elif direction == 1:  # Northeast
+            to_col = from_col + distance
+            to_row = from_row + distance
+        elif direction == 2:  # East
+            to_col = from_col + distance
+            to_row = from_row
+        elif direction == 3:  # Southeast
+            to_col = from_col + distance
+            to_row = from_row - distance
+        elif direction == 4:  # South
+            to_col = from_col
+            to_row = from_row - distance
+        elif direction == 5:  # Southwest
+            to_col = from_col - distance
+            to_row = from_row - distance
+        elif direction == 6:  # West
+            to_col = from_col - distance
+            to_row = from_row
+        else:  # Northwest
+            to_col = from_col - distance
+            to_row = from_row + distance
+
+        # Ensure the destination square is within bounds
+        if not (0 <= to_row < 8 and 0 <= to_col < 8):
+            raise ValueError("Invalid move: destination out of bounds")
+
+        to_square = chess.square(to_col, to_row)
+        return chess.Move(from_square, to_square)
+
+    # Handle knight moves (next 8 indices)
+    elif move_type < 64:
+        knight_offset = move_type - 56
+        knight_moves = [
+            (-2, 1),
+            (-1, 2),
+            (1, 2),
+            (2, 1),
+            (2, -1),
+            (1, -2),
+            (-1, -2),
+            (-2, -1),
+        ]
+        col_offset, row_offset = knight_moves[knight_offset]
+        to_col = from_col + col_offset
+        to_row = from_row + row_offset
+
+        # Ensure the destination square is within bounds
+        if not (0 <= to_row < 8 and 0 <= to_col < 8):
+            raise ValueError("Invalid move: destination out of bounds")
+
+        to_square = chess.square(to_col, to_row)
+        return chess.Move(from_square, to_square)
+
+    # Handle promotion moves (last 12 indices)
+    else:
+        promotion_type = (move_type - 64) // 3
+        col_offset = (move_type - 64) % 3 - 1  # -1, 0, or 1
+        promotion_pieces = [chess.KNIGHT, chess.ROOK, chess.BISHOP, chess.QUEEN]
+
+        # Determine promotion direction based on pawn color
+        row_offset = 1 if color == chess.WHITE else -1
+        to_col = from_col + col_offset
+        to_row = from_row + row_offset
+
+        # Ensure the destination square is within bounds
+        if not (0 <= to_row < 8 and 0 <= to_col < 8):
+            raise ValueError("Invalid promotion move: destination out of bounds")
+
+        to_square = chess.square(to_col, to_row)
+        return chess.Move(
+            from_square, to_square, promotion=promotion_pieces[promotion_type]
+        )

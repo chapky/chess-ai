@@ -83,61 +83,55 @@ class StandardEncoder:
 
     def encode_move(self, move: chess.Move) -> int:
         """Convert a chess move into a move index.
-
+        
         The move space is encoded as:
-        - Queen moves (0-55): 8 directions × 7 distances
-        - Knight moves (56-63): 8 possible knight moves
-        - Promotions (64-75): 4 piece types × 3 files
+        - Each source square (0-63) has 76 possible moves:
+            - Queen moves (0-55): 8 directions × 7 distances
+            - Knight moves (56-63): 8 possible knight moves
+            - Promotions (64-75): 4 piece types × 3 files
         """
-        from_sq, to_sq = move.from_square, move.to_square
+        from_sq = move.from_square
         from_row, from_col = divmod(from_sq, 8)
-        to_row, to_col = divmod(to_sq, 8)
-
+        to_row, to_col = divmod(move.to_square, 8)
+        
+        # Base index for the source square
+        base_index = from_row * 8 * 76 + from_col * 76
+        
         # Handle promotions
         if move.promotion:
-            col_offset = to_col - from_col + 1  # -1, 0, or 1 -> 0, 1, 2
-            if move.promotion == chess.QUEEN:
-                return 64 + 9 + col_offset
-            elif move.promotion == chess.BISHOP:
-                return 64 + 6 + col_offset
-            elif move.promotion == chess.ROOK:
-                return 64 + 3 + col_offset
-            elif move.promotion == chess.KNIGHT:
-                return 64 + col_offset
-
+            promotion_types = {
+                chess.KNIGHT: 0,
+                chess.ROOK: 1,
+                chess.BISHOP: 2,
+                chess.QUEEN: 3
+            }
+            col_offset = to_col - from_col + 1  # -1, 0, 1 -> 0, 1, 2
+            promotion_idx = promotion_types[move.promotion] * 3 + col_offset
+            return base_index + 64 + promotion_idx
+        
         # Handle knight moves
         row_diff = to_row - from_row
         col_diff = to_col - from_col
-        if abs(row_diff) == 2 and abs(col_diff) == 1:
-            if row_diff == 2:
-                return 56 + (3 if col_diff == 1 else 4)
-            else:  # row_diff == -2
-                return 56 + (0 if col_diff == 1 else 7)
-        elif abs(row_diff) == 1 and abs(col_diff) == 2:
-            if row_diff == 1:
-                return 56 + (1 if col_diff == 2 else 6)
-            else:  # row_diff == -1
-                return 56 + (2 if col_diff == 2 else 5)
-
+        knight_moves = [
+            (-2, 1), (-1, 2), (1, 2), (2, 1),
+            (2, -1), (1, -2), (-1, -2), (-2, -1)
+        ]
+        if (row_diff, col_diff) in knight_moves:
+            knight_idx = knight_moves.index((row_diff, col_diff))
+            return base_index + 56 + knight_idx
+        
         # Handle queen moves (including rook and bishop moves)
-        distance = max(abs(row_diff), abs(col_diff)) - 1
-        if row_diff == col_diff:  # Diagonal
-            if row_diff > 0:  # Up-right
-                return 7 + distance * 8
-            else:  # Down-left
-                return 3 + distance * 8
-        elif row_diff == -col_diff:  # Anti-diagonal
-            if row_diff > 0:  # Up-left
-                return 1 + distance * 8
-            else:  # Down-right
-                return 5 + distance * 8
-        elif row_diff == 0:  # Horizontal
-            if col_diff > 0:  # Right
-                return 6 + distance * 8
-            else:  # Left
-                return 2 + distance * 8
-        else:  # Vertical
-            if row_diff > 0:  # Up
-                return 0 + distance * 8
-            else:  # Down
-                return 4 + distance * 8
+        distance = max(abs(row_diff), abs(col_diff))
+        if row_diff == 0:  # Horizontal
+            direction = 2 if col_diff > 0 else 6  # East or West
+        elif col_diff == 0:  # Vertical
+            direction = 0 if row_diff > 0 else 4  # North or South
+        elif abs(row_diff) == abs(col_diff):  # Diagonal
+            if row_diff > 0:  # North diagonals
+                direction = 1 if col_diff > 0 else 7  # Northeast or Northwest
+            else:  # South diagonals
+                direction = 3 if col_diff > 0 else 5  # Southeast or Southwest
+        else:
+            raise ValueError("Invalid move: not a valid queen, rook, or bishop move")
+        
+        return base_index + (distance - 1) * 8 + direction
