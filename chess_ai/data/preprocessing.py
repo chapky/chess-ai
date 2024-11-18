@@ -82,21 +82,62 @@ class StandardEncoder:
         return tensor, consts
 
     def encode_move(self, move: chess.Move) -> int:
-        """Encodes a move into a move index.
+        """Convert a chess move into a move index.
 
-        The move space is encoded as follows:
-        - Regular moves: 0-4799
-        - Promotions: 4800-4863
+        The move space is encoded as:
+        - Queen moves (0-55): 8 directions × 7 distances
+        - Knight moves (56-63): 8 possible knight moves
+        - Promotions (64-75): 4 piece types × 3 files
         """
-        # Implementation of move encoding logic
-        # This is a simplified version - you'll want to add the full logic
-        base_idx = move.from_square * 64 + move.to_square
+        from_sq, to_sq = move.from_square, move.to_square
+        from_row, from_col = divmod(from_sq, 8)
+        to_row, to_col = divmod(to_sq, 8)
+
+        # Handle promotions
         if move.promotion:
-            promotion_offset = {
-                chess.QUEEN: 0,
-                chess.ROOK: 16,
-                chess.BISHOP: 32,
-                chess.KNIGHT: 48,
-            }[move.promotion]
-            return 4800 + promotion_offset + (move.from_square % 8)
-        return base_idx
+            col_offset = to_col - from_col + 1  # -1, 0, or 1 -> 0, 1, 2
+            if move.promotion == chess.QUEEN:
+                return 64 + 9 + col_offset
+            elif move.promotion == chess.BISHOP:
+                return 64 + 6 + col_offset
+            elif move.promotion == chess.ROOK:
+                return 64 + 3 + col_offset
+            elif move.promotion == chess.KNIGHT:
+                return 64 + col_offset
+
+        # Handle knight moves
+        row_diff = to_row - from_row
+        col_diff = to_col - from_col
+        if abs(row_diff) == 2 and abs(col_diff) == 1:
+            if row_diff == 2:
+                return 56 + (3 if col_diff == 1 else 4)
+            else:  # row_diff == -2
+                return 56 + (0 if col_diff == 1 else 7)
+        elif abs(row_diff) == 1 and abs(col_diff) == 2:
+            if row_diff == 1:
+                return 56 + (1 if col_diff == 2 else 6)
+            else:  # row_diff == -1
+                return 56 + (2 if col_diff == 2 else 5)
+
+        # Handle queen moves (including rook and bishop moves)
+        distance = max(abs(row_diff), abs(col_diff)) - 1
+        if row_diff == col_diff:  # Diagonal
+            if row_diff > 0:  # Up-right
+                return 7 + distance * 8
+            else:  # Down-left
+                return 3 + distance * 8
+        elif row_diff == -col_diff:  # Anti-diagonal
+            if row_diff > 0:  # Up-left
+                return 1 + distance * 8
+            else:  # Down-right
+                return 5 + distance * 8
+        elif row_diff == 0:  # Horizontal
+            if col_diff > 0:  # Right
+                return 6 + distance * 8
+            else:  # Left
+                return 2 + distance * 8
+        else:  # Vertical
+            if row_diff > 0:  # Up
+                return 0 + distance * 8
+            else:  # Down
+                return 4 + distance * 8
