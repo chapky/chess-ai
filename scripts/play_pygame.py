@@ -1,5 +1,8 @@
 from pathlib import Path
 
+#can't import chess 
+# import chess
+
 import chess
 import click
 import torch
