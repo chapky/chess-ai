@@ -16,7 +16,12 @@ from chess_ai.ui.pygame_ui import PygameUI
 def load_model(checkpoint_path: str, device: torch.device) -> ChessAISmaller:
     model = ChessAISmaller()
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint)
+
+    if "model_state_dict" in checkpoint:
+        model.load_state_dict(checkpoint["model_state_dict"])
+    else:
+        model.load_state_dict(checkpoint)
+
     return model
 
 
