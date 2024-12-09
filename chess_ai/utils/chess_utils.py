@@ -106,7 +106,7 @@ def info_to_move(from_square: int, to_square: int, promotion=None):
     return move
 
 
-def decode_move_index(index: int, color: chess.Color) -> chess.Move:
+def _slow_decode_move_index(index: int, color: chess.Color) -> chess.Move:
     tensor_8_8_76_form = zeros(8 * 8 * 76)
     tensor_8_8_76_form[index] = 1
     tensor_8_8_76_form = tensor_8_8_76_form.view(8, 8, 76)
@@ -201,7 +201,7 @@ def decode_move_index(index: int, color: chess.Color) -> chess.Move:
     raise ValueError(f"Invalid move index: {index}")
 
 
-def _unworking_decode_move_index(index: int, color: chess.Color) -> chess.Move:
+def decode_move_index(index: int, color: chess.Color) -> chess.Move:
     """Convert a move index back to a chess move.
 
     Args:
@@ -214,98 +214,81 @@ def _unworking_decode_move_index(index: int, color: chess.Color) -> chess.Move:
     Raises:
         ValueError: If the move index results in an invalid move.
     """
-    # Get source square coordinates
-    from_row = index // (8 * 76)  # Each square has 76 possible moves
-    from_col = (index % (8 * 76)) // 76
-
-    # Ensure the source square is within bounds
-    if not (0 <= from_row < 8 and 0 <= from_col < 8):
-        raise ValueError(f"Invalid source square: out of bounds: {from_row}, {from_col}")
-
-    from_square = chess.square(from_col, from_row)
-    move_type = index % 76
-
-    # Handle queen moves (first 56 indices)
-    if move_type < 56:
-        direction = move_type % 8  # 8 possible directions
-        distance = move_type // 8 + 1  # 1-7 squares in each direction
-
-        # Destination square calculation
-        if direction == 0:  # North
-            to_col = from_col
-            to_row = from_row + distance
-        elif direction == 1:  # Northeast
-            to_col = from_col + distance
-            to_row = from_row + distance
-        elif direction == 2:  # East
-            to_col = from_col + distance
-            to_row = from_row
-        elif direction == 3:  # Southeast
-            to_col = from_col + distance
-            to_row = from_row - distance
-        elif direction == 4:  # South
-            to_col = from_col
-            to_row = from_row - distance
-        elif direction == 5:  # Southwest
-            to_col = from_col - distance
-            to_row = from_row - distance
-        elif direction == 6:  # West
-            to_col = from_col - distance
-            to_row = from_row
-        else:  # Northwest
-            to_col = from_col - distance
-            to_row = from_row + distance
-
-        # Ensure the destination square is within bounds
-        if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError(f"Invalid move: destination out of bounds: {to_row}, {to_col}")
-        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
-
-        to_square = chess.square(to_col, to_row)
-        return chess.Move(from_square, to_square)
-
-    # Handle knight moves (next 8 indices)
-    elif move_type < 64:
-        knight_offset = move_type - 56
-        knight_moves = [
-            (-2, 1),
-            (-1, 2),
-            (1, 2),
-            (2, 1),
-            (2, -1),
-            (1, -2),
-            (-1, -2),
-            (-2, -1),
-        ]
-        col_offset, row_offset = knight_moves[knight_offset]
-        to_col = from_col + col_offset
-        to_row = from_row + row_offset
-
-        # Ensure the destination square is within bounds
-        if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError(f"Invalid move: destination out of bounds: {to_row}, {to_col}")
-        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
-
-        to_square = chess.square(to_col, to_row)
-        return chess.Move(from_square, to_square)
-
-    # Handle promotion moves (last 12 indices)
-    else:
-        promotion_type = (move_type - 64) // 3
-        col_offset = (move_type - 64) % 3 - 1  # -1, 0, or 1
-        promotion_pieces = [chess.KNIGHT, chess.ROOK, chess.BISHOP, chess.QUEEN]
-
-        # Determine promotion direction based on pawn color
-        row_offset = 1 if color == chess.WHITE else -1
-        to_col = from_col + col_offset
-        to_row = from_row + row_offset
-
-        # Ensure the destination square is within bounds
-        if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError(f"Invalid promotion move: destination out of bounds: {to_row}, {to_col}")
-        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
-
-        to_square = chess.square(to_col, to_row)
-        return chess.Move(
-            from_square, to_square, promotion=promotion_pieces[promotion_type]
+    move = index % 76
+    col = (index // 76) % 8
+    row = index // (8 * 76)
+    from_square = chess.square(col, row)
+    promotion = None
+    if 64 <= move < 67:
+        promotion = chess.KNIGHT
+        to_square = chess.square(
+            col - 65 + move, row + 1 if color == chess.WHITE else row - 1
         )
+        return info_to_move(from_square, to_square, promotion)
+    if 67 <= move < 70:
+        promotion = chess.ROOK
+        to_square = chess.square(
+            col - 68 + move, row + 1 if color == chess.WHITE else row - 1
+        )
+        return info_to_move(from_square, to_square, promotion)
+    if 70 <= move < 73:
+        promotion = chess.BISHOP
+        to_square = chess.square(
+            col - 71 + move, row + 1 if color == chess.WHITE else row - 1
+        )
+        return info_to_move(from_square, to_square, promotion)
+    if 73 <= move < 76:
+        promotion = chess.QUEEN
+        to_square = chess.square(
+            col - 74 + move, row + 1 if color == chess.WHITE else row - 1
+        )
+        return info_to_move(from_square, to_square, promotion)
+    if move % 8 == 7 and move < 56:
+        to_square = chess.square(col + move // 8 + 1, row + move // 8 + 1)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 3 and move < 52:
+        to_square = chess.square(col - move // 8 - 1, row - move // 8 - 1)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 1 and move < 50:
+        to_square = chess.square(col - move // 8 - 1, row + move // 8 + 1)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 5 and move < 54:
+        to_square = chess.square(col + move // 8 + 1, row - move // 8 - 1)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 6 and move < 55:
+        to_square = chess.square(col + move // 8 + 1, row)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 2 and move < 51:
+        to_square = chess.square(col - move // 8 - 1, row)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 0 and move < 49:
+        to_square = chess.square(col, row + move // 8 + 1)
+        return info_to_move(from_square, to_square)
+    if move % 8 == 4 and move < 53:
+        to_square = chess.square(col, row - move // 8 - 1)
+        return info_to_move(from_square, to_square)
+    if move == 56:
+        to_square = chess.square(col - 1, row + 2)
+        return info_to_move(from_square, to_square)
+    if move == 57:
+        to_square = chess.square(col - 2, row + 1)
+        return info_to_move(from_square, to_square)
+    if move == 58:
+        to_square = chess.square(col - 2, row - 1)
+        return info_to_move(from_square, to_square)
+    if move == 59:
+        to_square = chess.square(col - 1, row - 2)
+        return info_to_move(from_square, to_square)
+    if move == 60:
+        to_square = chess.square(col + 1, row - 2)
+        return info_to_move(from_square, to_square)
+    if move == 61:
+        to_square = chess.square(col + 2, row - 1)
+        return info_to_move(from_square, to_square)
+    if move == 62:
+        to_square = chess.square(col + 2, row + 1)
+        return info_to_move(from_square, to_square)
+    if move == 63:
+        to_square = chess.square(col + 1, row + 2)
+        return info_to_move(from_square, to_square)
+    raise ValueError(f"Invalid move index: {index}")

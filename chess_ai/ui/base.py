@@ -5,7 +5,9 @@ import chess
 import torch
 from chess import pgn
 
+from chess_ai.data.preprocessing import GameEncoder, StandardEncoder
 from chess_ai.utils.chess_utils import decode_move_index
+from chess_ai.models.base import ChessPolicyModel
 
 
 @dataclass
@@ -63,10 +65,11 @@ class GameController:
     def __init__(
         self,
         ui: ChessUI,
-        model: torch.nn.Module,
-        encoder,  # Using the encoder protocol from data/preprocessing.py
+        model: ChessPolicyModel,
+        encoder: GameEncoder,  # Using the encoder protocol from data/preprocessing.py
         device: torch.device,
         color: chess.Color = chess.WHITE,
+        verbose: bool = False,
     ):
         """Initialize controller.
 
@@ -82,6 +85,7 @@ class GameController:
         self.device = device
         self.board = chess.Board()
         self.color = color
+        self.verbose = verbose
 
     def play_game(self, player_color: chess.Color = chess.WHITE) -> None:
         """Play a full game.
@@ -141,16 +145,22 @@ class GameController:
                 try:
                     move = decode_move_index(int(idx.item()), self.color)
                 except ValueError as e:
-                    print(f"Trying move: {idx.item()}; Error: {e}")
+                    if self.verbose:
+                        print(f"Trying move: {idx.item()}; Error: {e}")
                     continue
-                if idx.item() == 4771:
-                    continue
-                print(f"Trying move {move.uci()} ({idx.item()})", end="")
+                # Why was it here?
+                # if idx.item() == 4771:
+                #     continue
+                if self.verbose:
+                    print(f"Trying move {move.uci()} ({idx.item()})", end="")
                 if move in game.legal_moves:
-                    print()
+                    if self.verbose:
+                        print()
                     return move
-                print(" - illegal")
-        print("No valid move found!")
+                if self.verbose:
+                    print(" - illegal")
+        if self.verbose:
+            print("No valid move found!")
         # Fallback to random legal move if no valid move found
         return next(iter(game.legal_moves))
 
