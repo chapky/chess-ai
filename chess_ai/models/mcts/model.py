@@ -15,6 +15,14 @@ import torch
 from chess import Board, Move, pgn
 
 
+state1 = []
+state2 = []
+consts1 = []
+consts2 = []
+probabilities1 = []
+probabilities2 = []
+
+
 class Node:
     def __init__(
         self,
@@ -78,7 +86,7 @@ class Node:
             return 0
 
     def value(self) -> float:
-        # self.value_model.eval()
+        # self.value_model.eval() # todo enable when this is replaced with an actual model
         with torch.no_grad():
             state, consts = self.encoder.encode_game_state(self.game_state)
             state = state.permute(2, 0, 1).unsqueeze(0).to(self.device)
@@ -98,9 +106,14 @@ class Node:
         with torch.no_grad():
             if self.verbose_level >= 2:
                 print("Encoding game state...")
+                print("Doing on game state: ", self.game_state)
             state, consts = self.encoder.encode_game_state(self.game_state)
             state = state.permute(2, 0, 1).unsqueeze(0).to(self.device)
             consts = consts.unsqueeze(0).to(self.device)
+            global state1
+            state1 = state
+            global consts1
+            consts1 = consts
 
             if self.verbose_level >= 2:
                 print("Using the model to get children...")
@@ -108,8 +121,10 @@ class Node:
             if self.verbose_level >= 2:
                 print("Softmaxing...")
             probabilities = torch.softmax(outputs, dim=1)
-            # if self.verbose_level >= 1:
-            print([i.item() for i in probabilities[0]])
+            # if self.verbose_level >= 2: # WHYY DIFFERENT
+            # print([i.item() for i in probabilities[0]])
+            global probabilities1
+            probabilities1 = probabilities
             if self.verbose_level >= 2:
                 print("Filtering legal moves...")
             moves: list[tuple[Move, float]] = []
@@ -219,6 +234,24 @@ class MCTS:
         self.rollout_model = ChessAISmaller().to(device)
         self.value_model = lambda _, __: [0]
         new_game = pgn.Game()
+
+        # WHYYY?
+        state, consts = StandardEncoder().encode_game_state(new_game.board())
+        state = state.permute(2, 0, 1).unsqueeze(0).to(device)
+        consts = consts.unsqueeze(0).to(device)
+        global state2
+        state2 = state
+        global consts2
+        consts2 = consts
+        # if verbose_level >= 2: # WHYY
+        self.policy_model.eval()
+        print("Doing on game state: ", new_game.board())
+        with torch.no_grad():
+            probabilities = self.policy_model(state, consts)
+            global probabilities2
+            probabilities2 = probabilities
+        # print([i.item() for i in probabilities[0]])
+
         self.tree: Node = Node(
             new_game.board(),
             None,
@@ -260,5 +293,32 @@ if __name__ == "__main__":
     mcts = MCTS(device, verbose_level=0)
     print_tree(mcts.tree)
     move = mcts.get_move(1)
+    different = False
+    for i in range(len(state1)):
+        for j in range(len(state1[0])):
+            for k in range(len(state1[0][0])):
+                if state1[i][j][k][0] != state2[i][j][k][0]:
+                    different = True
+    if different:
+        print("Different states")
+        print(state1)
+        print(state2)
+    different = False
+    for i in range(len(consts1)):
+        if consts1[i][0] != consts2[i][0]:
+            different = True
+    if different:
+        print("Different consts")
+        print(consts1)
+        print(consts2)
+    different = False
+    for i in range(len(probabilities1)):
+        for j in range(len(probabilities1[0])):
+            if probabilities1[i][j] != probabilities2[i][j]:
+                different = True
+    if different:
+        print("Different probabilities")
+        print(probabilities1)
+        print(probabilities2)
     print(move)
     # print_tree(mcts.tree)
