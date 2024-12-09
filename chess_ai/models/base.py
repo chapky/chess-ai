@@ -1,17 +1,15 @@
 from typing import Protocol, runtime_checkable
 
-import torch.nn as nn
 from torch import Tensor
 
 
 @runtime_checkable
-class ChessModel(Protocol):
+class ChessPolicyModel(Protocol):
     """Protocol defining the interface for chess models.
 
     Any class implementing this protocol must:
-    1. Inherit from nn.Module
-    2. Implement forward() with the specified signature
-    3. Implement parameter_count()
+    1. Implement forward() with the specified signature
+    2. Implement parameter_count()
 
     The @runtime_checkable decorator allows isinstance() checks,
     though they should be used sparingly in production code.
@@ -37,8 +35,8 @@ class ChessModel(Protocol):
 
 
 # Example implementation check function
-def check_model_implementation(model: nn.Module) -> bool:
-    """Verify that a model properly implements the ChessModel protocol.
+def check_model_implementation(model) -> bool:
+    """Verify that a model properly implements the ChessPolicyModel protocol.
 
     Args:
         model: The model to check
@@ -49,9 +47,9 @@ def check_model_implementation(model: nn.Module) -> bool:
     Raises:
         TypeError: If the model doesn't implement required methods
     """
-    if not isinstance(model, ChessModel):
+    if not isinstance(model, ChessPolicyModel):
         raise TypeError(
-            f"{model.__class__.__name__} doesn't implement the ChessModel protocol.\n"
+            f"{model.__class__.__name__} doesn't implement the ChessPolicyModel protocol.\n"
             "Required methods: forward(board_state, additional_params), "
             "parameter_count()"
         )

@@ -141,13 +141,15 @@ class GameController:
                 try:
                     move = decode_move_index(int(idx.item()), self.color)
                 except ValueError as e:
-                    print(f"Error: {e}")
+                    print(f"Trying move: {idx.item()}; Error: {e}")
                     continue
-                print(f"Trying move: {idx.item()}")
                 if idx.item() == 4771:
                     continue
+                print(f"Trying move {move.uci()} ({idx.item()})", end="")
                 if move in game.legal_moves:
+                    print()
                     return move
+                print(" - illegal")
         print("No valid move found!")
         # Fallback to random legal move if no valid move found
         return next(iter(game.legal_moves))

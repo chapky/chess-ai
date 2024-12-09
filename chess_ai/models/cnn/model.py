@@ -7,7 +7,7 @@ from torch import Tensor
 class ChessAISmaller(nn.Module):
     """A smaller CNN architecture for chess move prediction.
 
-    This class implements the ChessModel protocol through its
+    This class implements the ChessPolicyModel protocol through its
     method signatures rather than explicit inheritance.
     """
 

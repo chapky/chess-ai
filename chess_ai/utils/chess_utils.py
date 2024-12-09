@@ -1,5 +1,5 @@
 import chess
-from torch import Tensor
+from torch import Tensor, zeros
 
 
 def tensor_to_board(tensor: Tensor) -> chess.Board:
@@ -86,7 +86,122 @@ class EloRange:
         return 4000 * cls.MULTIPLIERS[idx]
 
 
+def info_to_move(from_square: int, to_square: int, promotion=None):
+    if from_square < 0 or from_square > 63 or to_square < 0 or to_square > 63:
+        from_col = from_square % 8
+        from_row = from_square // 8
+        to_col = to_square % 8
+        to_row = to_square // 8
+        raise ValueError(f"Invalid move, out of bounds: {from_col}, {from_row} -> {to_col}, {to_row}")
+    move = chess.Move(from_square, to_square)
+    if promotion:
+        if promotion == chess.QUEEN:
+            move.promotion = chess.QUEEN
+        elif promotion == chess.BISHOP:
+            move.promotion = chess.BISHOP
+        elif promotion == chess.ROOK:
+            move.promotion = chess.ROOK
+        elif promotion == chess.KNIGHT:
+            move.promotion = chess.KNIGHT
+    return move
+
+
 def decode_move_index(index: int, color: chess.Color) -> chess.Move:
+    tensor_8_8_76_form = zeros(8 * 8 * 76)
+    tensor_8_8_76_form[index] = 1
+    tensor_8_8_76_form = tensor_8_8_76_form.view(8, 8, 76)
+    for row in range(8):
+        for col in range(8):
+            promotion = None
+            from_square = chess.square(col, row)
+            for i in range(64, 67):
+                if tensor_8_8_76_form[row][col][i]:
+                    promotion = chess.KNIGHT
+                    to_square = chess.square(
+                        col - 65 + i, row + 1 if color == chess.WHITE else row - 1
+                    )
+                    return info_to_move(from_square, to_square, promotion)
+            for i in range(67, 70):
+                if tensor_8_8_76_form[row][col][i]:
+                    promotion = chess.ROOK
+                    to_square = chess.square(
+                        col - 68 + i, row + 1 if color == chess.WHITE else row - 1
+                    )
+                    return info_to_move(from_square, to_square, promotion)
+            for i in range(70, 73):
+                if tensor_8_8_76_form[row][col][i]:
+                    promotion = chess.BISHOP
+                    to_square = chess.square(
+                        col - 71 + i, row + 1 if color == chess.WHITE else row - 1
+                    )
+                    return info_to_move(from_square, to_square, promotion)
+            for i in range(73, 76):
+                if tensor_8_8_76_form[row][col][i]:
+                    promotion = chess.QUEEN
+                    to_square = chess.square(
+                        col - 74 + i, row + 1 if color == chess.WHITE else row - 1
+                    )
+                    return info_to_move(from_square, to_square, promotion)
+            for i in range(7, 56, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col + i // 8 + 1, row + i // 8 + 1)
+                    return info_to_move(from_square, to_square)
+            for i in range(3, 52, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col - i // 8 - 1, row - i // 8 - 1)
+                    return info_to_move(from_square, to_square)
+            for i in range(1, 50, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col - i // 8 - 1, row + i // 8 + 1)
+                    return info_to_move(from_square, to_square)
+            for i in range(5, 54, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col + i // 8 + 1, row - i // 8 - 1)
+                    return info_to_move(from_square, to_square)
+            for i in range(6, 55, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col + i // 8 + 1, row)
+                    return info_to_move(from_square, to_square)
+            for i in range(2, 51, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col - i // 8 - 1, row)
+                    return info_to_move(from_square, to_square)
+            for i in range(0, 49, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col, row + i // 8 + 1)
+                    return info_to_move(from_square, to_square)
+            for i in range(4, 53, 8):
+                if tensor_8_8_76_form[row][col][i]:
+                    to_square = chess.square(col, row - i // 8 - 1)
+                    return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][56]:
+                to_square = chess.square(col - 1, row + 2)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][57]:
+                to_square = chess.square(col - 2, row + 1)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][58]:
+                to_square = chess.square(col - 2, row - 1)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][59]:
+                to_square = chess.square(col - 1, row - 2)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][60]:
+                to_square = chess.square(col + 1, row - 2)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][61]:
+                to_square = chess.square(col + 2, row - 1)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][62]:
+                to_square = chess.square(col + 2, row + 1)
+                return info_to_move(from_square, to_square)
+            if tensor_8_8_76_form[row][col][63]:
+                to_square = chess.square(col + 1, row + 2)
+                return info_to_move(from_square, to_square)
+    raise ValueError(f"Invalid move index: {index}")
+
+
+def _unworking_decode_move_index(index: int, color: chess.Color) -> chess.Move:
     """Convert a move index back to a chess move.
 
     Args:
@@ -105,7 +220,7 @@ def decode_move_index(index: int, color: chess.Color) -> chess.Move:
 
     # Ensure the source square is within bounds
     if not (0 <= from_row < 8 and 0 <= from_col < 8):
-        raise ValueError("Invalid source square: out of bounds")
+        raise ValueError(f"Invalid source square: out of bounds: {from_row}, {from_col}")
 
     from_square = chess.square(from_col, from_row)
     move_type = index % 76
@@ -143,7 +258,8 @@ def decode_move_index(index: int, color: chess.Color) -> chess.Move:
 
         # Ensure the destination square is within bounds
         if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError("Invalid move: destination out of bounds")
+            raise ValueError(f"Invalid move: destination out of bounds: {to_row}, {to_col}")
+        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
 
         to_square = chess.square(to_col, to_row)
         return chess.Move(from_square, to_square)
@@ -167,7 +283,8 @@ def decode_move_index(index: int, color: chess.Color) -> chess.Move:
 
         # Ensure the destination square is within bounds
         if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError("Invalid move: destination out of bounds")
+            raise ValueError(f"Invalid move: destination out of bounds: {to_row}, {to_col}")
+        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
 
         to_square = chess.square(to_col, to_row)
         return chess.Move(from_square, to_square)
@@ -185,7 +302,8 @@ def decode_move_index(index: int, color: chess.Color) -> chess.Move:
 
         # Ensure the destination square is within bounds
         if not (0 <= to_row < 8 and 0 <= to_col < 8):
-            raise ValueError("Invalid promotion move: destination out of bounds")
+            raise ValueError(f"Invalid promotion move: destination out of bounds: {to_row}, {to_col}")
+        print(f"{from_row}, {from_col} -> {to_row}, {to_col}")
 
         to_square = chess.square(to_col, to_row)
         return chess.Move(
