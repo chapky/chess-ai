@@ -1,10 +1,13 @@
 from __future__ import annotations
+from chess import Board, Color, Move
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from chess_ai.models.base import ChessValueModel
+from chess_ai.data.preprocessing import GameEncoder
+from chess_ai.models.base import ChessPolicyModel, ChessValueModel, get_move
+from chess_ai.utils.chess_utils import decode_move_index
 
 
 class ChessAISmaller(nn.Module):
@@ -56,6 +59,16 @@ class ChessAISmaller(nn.Module):
         """Returns the total number of parameters in the model."""
         return sum(p.numel() for p in self.parameters())
 
+    def get_move(
+        self: ChessPolicyModel,
+        encoder: GameEncoder,
+        board: Board,
+        device: torch.device,
+        color: Color,
+        verbose: bool = False,
+    ) -> Move:
+        return get_move(self, encoder, board, device, color, verbose)
+
 
 class ChessAITiny(nn.Module):
     """A tiny CNN architecture for chess move prediction.
@@ -100,6 +113,20 @@ class ChessAITiny(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         return self.fc2(x)
+
+    def parameter_count(self) -> int:
+        """Returns the total number of parameters in the model."""
+        return sum(p.numel() for p in self.parameters())
+
+    def get_move(
+        self: ChessPolicyModel,
+        encoder: GameEncoder,
+        board: Board,
+        device: torch.device,
+        color: Color,
+        verbose: bool = False,
+    ) -> Move:
+        return get_move(self, encoder, board, device, color, verbose)
 
 
 class ChessAIValue(nn.Module):

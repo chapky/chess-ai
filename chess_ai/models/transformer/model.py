@@ -1,5 +1,9 @@
+from chess import Board, Color, Move
 import torch
 import torch.nn as nn
+
+from chess_ai.data.preprocessing import GameEncoder
+from chess_ai.models.base import ChessPolicyModel, get_move
 
 
 class ChessTransformer(nn.Module):
@@ -123,3 +127,13 @@ class ChessTransformer(nn.Module):
     def parameter_count(self) -> int:
         """Returns the total number of parameters in the model."""
         return sum(p.numel() for p in self.parameters())
+
+    def get_move(
+        self: ChessPolicyModel,
+        encoder: GameEncoder,
+        board: Board,
+        device: torch.device,
+        color: Color,
+        verbose: bool = False,
+    ) -> Move:
+        return get_move(self, encoder, board, device, color, verbose)

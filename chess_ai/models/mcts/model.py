@@ -7,14 +7,14 @@ from chess_ai.models.base import ChessPolicyModel, ChessValueModel
 
 from chess_ai.ui.base import GameController
 
-from chess_ai.data.preprocessing import StandardEncoder
+from chess_ai.data.preprocessing import GameEncoder, StandardEncoder
 from chess_ai.utils.chess_utils import decode_move_index
 
 import torch
 
 from tqdm import tqdm
 
-from chess import BLACK, WHITE, Board, Move, pgn
+from chess import BLACK, WHITE, Board, Color, Move, pgn
 
 
 class Node:
@@ -203,7 +203,8 @@ class Node:
             sign = -1
             while parent:
                 parent.evaluation = (
-                    parent.evaluation * (parent.visit_count - 1) + child.evaluation * sign
+                    parent.evaluation * (parent.visit_count - 1)
+                    + child.evaluation * sign
                 ) / parent.visit_count
                 parent = parent.parent
                 sign = -sign
@@ -234,6 +235,8 @@ class MCTS:
         self.value_model = value_model
         new_game = pgn.Game()
 
+        self.device = device
+
         self.tree: Node = Node(
             new_game.board(),
             None,
@@ -247,14 +250,39 @@ class MCTS:
         )
 
     def change_board(self, board: Board):
+        found = False
         for i in self.tree.children:
             if i == board:
                 self.tree = i
+                found = True
+        if not found:
+            self.tree = Node(
+                board,
+                None,
+                self.policy_model,
+                self.value_model,
+                self.rollout_model,
+                self.device,
+                prefer_rollout_coefficient=0.5,
+                exploration_coefficient=5,
+                verbose_level=0,
+            )
 
-    def get_move(self, max_steps: int = 1) -> Move | None:
+    def get_move(
+        self,
+        encoder: GameEncoder,
+        board: Board,
+        device: torch.device,
+        color: Color,
+        verbose: bool = False,
+        max_steps: int = 10,
+    ) -> Move | None:
+        if self.tree.game_state != board:
+            self.change_board(board)
         for _ in tqdm(range(max_steps)):
             self.tree.expand()
         best_child = max(self.tree.children, key=lambda x: x.visit_count)
+        print(f"Best move: {best_child.move_to_it}")
         return best_child.move_to_it
 
 
@@ -263,7 +291,7 @@ def print_tree(node: Node, current_depth: int = 0):
     tab = "   " * current_depth
     for i in board.split("\n"):
         print(tab + i)
-    print(f"{tab}Visit count: {node.visit_count}, Evaluation: {node.evaluation}")
+    print(f"{tab}Visit count: {node.visit_count}, Evaluation: {node.evaluation.item()}")
     for child in node.children:
         if not child.visit_count:
             continue

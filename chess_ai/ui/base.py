@@ -124,45 +124,13 @@ class GameController:
         Returns:
             Selected move
         """
-        self.model.eval()
-        with torch.no_grad():
-            # Encode game state
-            state, consts = self.encoder.encode_game_state(game)
-            state = state.permute(2, 0, 1).unsqueeze(0).to(self.device)
-            consts = consts.unsqueeze(0).to(self.device)
-
-            # Get model prediction
-            outputs = self.model(state, consts)
-            probabilities = torch.softmax(outputs, dim=1)
-
-            # Try moves in order of probability until we find a legal one
-            _, sorted_indices = torch.sort(probabilities, descending=True)
-            for idx in sorted_indices[0]:
-                # Decode move index to chess move
-                # This will raise an error if the move is invalid
-                # If the error is raised, we'll move on to the next move
-                # implement error handling
-                try:
-                    move = decode_move_index(int(idx.item()), self.color)
-                except ValueError as e:
-                    if self.verbose:
-                        print(f"Trying move: {idx.item()}; Error: {e}")
-                    continue
-                # Why was it here?
-                # if idx.item() == 4771:
-                #     continue
-                if self.verbose:
-                    print(f"Trying move {move.uci()} ({idx.item()})", end="")
-                if move in game.legal_moves:
-                    if self.verbose:
-                        print()
-                    return move
-                if self.verbose:
-                    print(" - illegal")
-        if self.verbose:
-            print("No valid move found!")
-        # Fallback to random legal move if no valid move found
-        return next(iter(game.legal_moves))
+        return self.model.get_move(
+            self.encoder,
+            game,
+            device=self.device,
+            color=self.color,
+            verbose=self.verbose,
+        )
 
     def _make_move(self, game: pgn.Game, move: chess.Move) -> MoveResult:
         """Attempt to make a move.
