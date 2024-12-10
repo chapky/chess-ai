@@ -66,13 +66,9 @@ Available options:
 
 ### Playing Against the Model
 
-Launch the Jupyter notebook interface:
-
 ```bash
-poetry run jupyter notebook notebooks/play.ipynb
+poetry run python scripts/play_cli.py < --checkpoint-path= > [ --model-type ] [ --value-checkpoint-path ]
 ```
-
-The notebook provides an interactive chessboard where you can play against the trained model.
 
 ## Model Architectures
 
