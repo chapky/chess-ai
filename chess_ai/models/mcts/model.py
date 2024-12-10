@@ -63,7 +63,8 @@ class Node:
             try:
                 move = self.controller._get_model_move(game.board())
             except StopIteration:
-                print("Winner: None")
+                if self.verbose_level >= 1:
+                    print("Winner: None")
                 return 0
             result = self.controller._make_move(game, move)
             if not result.game_over:
@@ -106,9 +107,6 @@ class Node:
         self.policy_model.eval()
         with torch.no_grad():
             outputs = self.policy_model(state, consts)
-            print([[[[x.item() for x in y[:2]] for y in j[:2]] for j in i[:2]] for i in state[:2]])
-            print([x.item() for x in consts[0][:10]])
-            print([x.item() for x in outputs[0][:10]])
             if self.verbose_level >= 2:
                 print("Softmaxing...")
             probabilities = torch.softmax(outputs, dim=1)
@@ -216,21 +214,18 @@ class Node:
 
 
 class MCTS:
-    def __init__(self, device: torch.device, verbose_level: int = 0):
-        self.policy_model = ChessAISmaller().to(device)
-        self.rollout_model = ChessAISmaller().to(device)
-        self.value_model = lambda _, __: [0]
+    def __init__(
+        self,
+        device: torch.device,
+        policy_model: ChessPolicyModel,
+        value_model: ChessValueModel,
+        rollout_model: ChessPolicyModel,
+        verbose_level: int = 0,
+    ):
+        self.policy_model = policy_model
+        self.rollout_model = rollout_model
+        self.value_model = value_model
         new_game = pgn.Game()
-
-        state, consts = StandardEncoder().encode_game_state(new_game.board())
-        state = state.permute(2, 0, 1).unsqueeze(0).to(device)
-        consts = consts.unsqueeze(0).to(device)
-        self.policy_model.eval()
-        with torch.no_grad():
-            outputs = self.policy_model(state, consts)
-        print([[[[x.item() for x in y[:2]] for y in j[:2]] for j in i[:2]] for i in state[:2]])
-        print([x.item() for x in consts[0][:10]])
-        print([x.item() for x in outputs[0][:10]])
 
         self.tree: Node = Node(
             new_game.board(),
@@ -270,8 +265,19 @@ def print_tree(node: Node, current_depth: int = 0):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    mcts = MCTS(device, verbose_level=0)
+    policy_model = ChessAISmaller().to(device)
+    checkpoint = torch.load(
+        "./checkpoints/model_parameters_2400-2800_epoch6_batch10220.pth",
+        map_location=device,
+    )
+    if "model_state_dict" in checkpoint:
+        policy_model.load_state_dict(checkpoint["model_state_dict"])
+    else:
+        policy_model.load_state_dict(checkpoint)
+    value_model = lambda _, __: [0]
+    rollout_model = policy_model
+    mcts = MCTS(device, policy_model, value_model, rollout_model, verbose_level=0)
     print_tree(mcts.tree)
-    move = mcts.get_move(1)
+    move = mcts.get_move(5)
     print(move)
     print_tree(mcts.tree)

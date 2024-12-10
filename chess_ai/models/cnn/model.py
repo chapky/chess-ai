@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from chess import pgn
+
+from chess_ai.data.preprocessing import StandardEncoder
+
 
 class ChessAISmaller(nn.Module):
     """A smaller CNN architecture for chess move prediction.
