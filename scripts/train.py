@@ -1,20 +1,27 @@
 from pathlib import Path
 
 import click
+import torch
 import wandb
 
-from chess_ai.data.dataset import ChessDataset
-from chess_ai.models.cnn.model import ChessAISmaller
+from chess_ai.data.dataset import ChessPolicyDataset, ChessValueDataset
+from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
 from chess_ai.models.transformer.model import ChessTransformer
-from chess_ai.training.trainer import train_model
+from chess_ai.training.trainer import WandbCallback, train_policy_model, train_value_model
 
 
 @click.command()
 @click.option(
-    "--model-type",
+    "--model-arch",
     type=click.Choice(["cnn", "transformer"]),
     default="cnn",
     help="Model architecture to use",
+)
+@click.option(
+    "--model-type",
+    type=click.Choice(["policy", "value"]),
+    default="policy",
+    help="Type and purpose of the model to train",
 )
 @click.option(
     "--data-path",
@@ -37,7 +44,20 @@ from chess_ai.training.trainer import train_model
     default="./models",
     help="Directory to save model checkpoints",
 )
+@click.option(
+    "--from-checkpoint",
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to a model checkpoint file (.pth) to resume training from",
+    required=False,
+)
+@click.option(
+    "--value-from-policy-path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to a policy model checkpoint file (.pth), from which to initialize thevalue model",
+    required=False,
+)
 def train(
+    model_arch: str,
     model_type: str,
     data_path: Path,
     rating_range: str,
@@ -45,6 +65,8 @@ def train(
     epochs: int,
     learning_rate: float,
     save_dir: Path,
+    value_from_policy_path: Path | None = None,
+    from_checkpoint: Path | None = None,
 ):
     """Train a chess model on Lichess game data."""
 
@@ -60,23 +82,55 @@ def train(
     )
 
     # Load data
-    dataset = ChessDataset.from_files(data_path, rating_range)
-
-    # Create model
-    if model_type == "cnn":
-        model = ChessAISmaller()
+    if model_type == "value":
+        dataset = ChessValueDataset.from_pgn(data_path, int(rating_range.split("-")[0]))
+        if value_from_policy_path is not None:
+            if from_checkpoint is not None:
+                raise ValueError(
+                    "Cannot specify both from_checkpoint and value_from_policy_path"
+                )
+            model = ChessAIValue.initialize_from_smaller_model(
+                str(value_from_policy_path)
+            )
+        elif model_arch == "cnn":
+            model = ChessAIValue()
+        else:
+            print("Value model ddoes not support other architectures than cnn yet")
     else:
-        model = ChessTransformer()
+        dataset = ChessPolicyDataset.from_files(data_path, rating_range)
+        if model_arch == "cnn":
+            model = ChessAISmaller()
+        else:
+            model = ChessTransformer()
+    if from_checkpoint is not None:
+        checkpoint = torch.load(from_checkpoint)
+        if "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            model.load_state_dict(checkpoint)
 
     # Train
-    train_model(
-        model=model,
-        dataset=dataset,
-        batch_size=batch_size,
-        epochs=epochs,
-        learning_rate=learning_rate,
-        save_dir=Path(save_dir),
-    )
+    callback = WandbCallback()
+    if model_type == "value":
+        train_value_model(
+            model=model,
+            dataset=dataset,
+            batch_size=batch_size,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            save_dir=Path(save_dir),
+            callback=callback,
+        )
+    else:
+        train_policy_model(
+            model=model,
+            dataset=dataset,
+            batch_size=batch_size,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            save_dir=Path(save_dir),
+            callback=callback,
+        )
 
 
 if __name__ == "__main__":

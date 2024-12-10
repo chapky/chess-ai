@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 import torch
 
-from chess_ai.data.dataset import ChessDataset
+from chess_ai.data.dataset import ChessPolicyDataset
 from chess_ai.data.preprocessing import StandardEncoder
 from chess_ai.utils.chess_utils import EloRange
 
@@ -51,7 +51,7 @@ def preprocess(input_dir: Path, output_dir: Path, rating_ranges: str):
         pgn_file = pgn_files[-1]
 
         # Create dataset
-        dataset = ChessDataset.from_pgn(pgn_file, base_rating, encoder)
+        dataset = ChessPolicyDataset.from_pgn(pgn_file, base_rating, encoder)
 
         # Save tensors using the exact format expected by train.py
         range_str = EloRange.get_range_str(base_rating)

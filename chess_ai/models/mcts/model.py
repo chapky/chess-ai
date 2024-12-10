@@ -1,7 +1,7 @@
 from __future__ import annotations
 from math import sqrt
 
-from chess_ai.models.cnn.model import ChessAISmaller
+from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
 from chess_ai.models.transformer.model import ChessTransformer
 from chess_ai.models.base import ChessPolicyModel, ChessValueModel
 
@@ -12,7 +12,9 @@ from chess_ai.utils.chess_utils import decode_move_index
 
 import torch
 
-from chess import Board, Move, pgn
+from tqdm import tqdm
+
+from chess import BLACK, WHITE, Board, Move, pgn
 
 
 class Node:
@@ -93,6 +95,9 @@ class Node:
         self.evaluation = (
             1 - self.prefer_rollout_coefficient
         ) * self.value() + self.prefer_rollout_coefficient * self.rollout_leaf()
+        # if black, flip
+        if self.game_state.turn == WHITE:
+            self.evaluation *= -1
 
     def get_children(self):
         if self.verbose_level >= 2:
@@ -195,11 +200,13 @@ class Node:
             parent = self
             if self.verbose_level >= 2:
                 print("Propagating evaluation...")
+            sign = -1
             while parent:
                 parent.evaluation = (
-                    parent.evaluation * (parent.visit_count - 1) + child.evaluation
+                    parent.evaluation * (parent.visit_count - 1) + child.evaluation * sign
                 ) / parent.visit_count
                 parent = parent.parent
+                sign = -sign
             return
         if self.verbose_level >= 2:
             print("Expanding child...")
@@ -245,7 +252,7 @@ class MCTS:
                 self.tree = i
 
     def get_move(self, max_steps: int = 1) -> Move | None:
-        for _ in range(max_steps):
+        for _ in tqdm(range(max_steps)):
             self.tree.expand()
         best_child = max(self.tree.children, key=lambda x: x.visit_count)
         return best_child.move_to_it
@@ -274,10 +281,17 @@ if __name__ == "__main__":
         policy_model.load_state_dict(checkpoint["model_state_dict"])
     else:
         policy_model.load_state_dict(checkpoint)
-    value_model = lambda _, __: [0]
+    value_model = ChessAIValue().to(device)
+    checkpoint = torch.load(
+        "./checkpoints/value/2400/value_model_epoch_10.pth", map_location=device
+    )
+    if "model_state_dict" in checkpoint:
+        value_model.load_state_dict(checkpoint["model_state_dict"])
+    else:
+        value_model.load_state_dict(checkpoint)
     rollout_model = policy_model
     mcts = MCTS(device, policy_model, value_model, rollout_model, verbose_level=0)
     print_tree(mcts.tree)
-    move = mcts.get_move(5)
+    move = mcts.get_move(100)
     print(move)
     print_tree(mcts.tree)

@@ -6,7 +6,7 @@ import torch
 from tqdm import tqdm
 
 import wandb
-from chess_ai.data.dataset import ChessDataset
+from chess_ai.data.dataset import ChessPolicyDataset
 from chess_ai.models.cnn.model import ChessAISmaller
 from chess_ai.models.transformer.model import ChessTransformer
 from chess_ai.training.trainer import calculate_metrics
@@ -33,7 +33,7 @@ def load_model(
 
 def evaluate_model(
     model: torch.nn.Module,
-    dataset: ChessDataset,
+    dataset: ChessPolicyDataset,
     batch_size: int,
     device: torch.device,
     use_wandb: bool = False,
@@ -157,7 +157,7 @@ def main(
 
     # Load evaluation data
     print("Loading evaluation data...")
-    dataset = ChessDataset.from_files(data_path, rating_range)
+    dataset = ChessPolicyDataset.from_files(data_path, rating_range)
     print(f"Loaded {len(dataset)} positions")
 
     # Evaluate
