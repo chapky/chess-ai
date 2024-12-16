@@ -1,5 +1,5 @@
 wandb/
-checkpoints/policy/transformer_policy_2400.pth
+# checkpoints/policy/transformer_policy_2400.pth
 
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
