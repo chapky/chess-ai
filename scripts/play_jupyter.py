@@ -6,18 +6,22 @@ import torch
 
 from chess_ai.data.preprocessing import StandardEncoder
 from chess_ai.models.cnn.model import ChessAISmaller
-from chess_ai.models.transformer.model import ChessTransformer
+from chess_ai.models.transformer.model import TransformerPolicyModel
 from chess_ai.ui.base import GameController
 from chess_ai.ui.jupyter import JupyterUI
+
+# TODO integrate MTCS
 
 
 def load_model(
     checkpoint_path: Path, model_type: str, device: torch.device
-) -> ChessAISmaller | ChessTransformer:
+) -> ChessAISmaller | TransformerPolicyModel:
+    model: ChessAISmaller | TransformerPolicyModel
+
     if model_type == "cnn":
         model = ChessAISmaller()
     else:
-        model = ChessTransformer()
+        model = TransformerPolicyModel()
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if "model_state_dict" in checkpoint:

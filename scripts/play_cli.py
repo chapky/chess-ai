@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 
 import chess
 import click
@@ -8,7 +9,10 @@ from chess_ai.data.preprocessing import StandardEncoder
 from chess_ai.models.base import ChessPolicyModel, ChessValueModel
 from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
 from chess_ai.models.mcts.model import MCTS
-from chess_ai.models.transformer.model import ChessTransformer
+from chess_ai.models.transformer.model import (
+    TransformerPolicyModel,
+    TransformerValueModel,
+)
 from chess_ai.ui.base import GameController
 from chess_ai.ui.cli import CliUI
 
@@ -19,9 +23,11 @@ def load_model(
     if model_type == "cnn":
         model = ChessAISmaller()
     elif model_type == "transformer":
-        model = ChessTransformer()
+        model = TransformerPolicyModel()
     elif model_type == "value-cnn":
         model = ChessAIValue()
+    elif model_type == "value-transformer":
+        model = TransformerValueModel()
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if "model_state_dict" in checkpoint:
@@ -48,7 +54,7 @@ def load_model(
 )
 @click.option(
     "--model-type",
-    type=click.Choice(["cnn", "transformer", "mcts"]),
+    type=click.Choice(["cnn", "transformer"]),
     default="cnn",
     help="Model architecture to use",
 )
@@ -56,24 +62,34 @@ def load_model(
     "--value-checkpoint-path",
     type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="Path to value model checkpoint file (.pth), if using MCTS",
+    help="Path to value model checkpoint file (.pth). Automatically enables MCTS.",
 )
-def main(checkpoint_path: Path, player_color: str, model_type: str, value_checkpoint_path: Path | None = None):
+def main(
+    checkpoint_path: Path,
+    player_color: str,
+    model_type: str,
+    value_checkpoint_path: Path | None = None,
+):
     """Play chess against a trained model via command line interface."""
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    model: ChessPolicyModel | MCTS
+
     # Load model
     print("Loading model...")
-    if model_type == "mcts":
-        if not value_checkpoint_path:
-            raise ValueError("Must provide value checkpoint path if using MCTS")
-        policy_model = load_model(checkpoint_path, "cnn", device)
-        value_model = load_model(value_checkpoint_path, "value-cnn", device)
+    if value_checkpoint_path:
+        policy_model = cast(
+            ChessPolicyModel, load_model(checkpoint_path, model_type, device)
+        )
+        value_model = cast(
+            ChessValueModel,
+            load_model(value_checkpoint_path, "value-" + model_type, device),
+        )
         model = MCTS(device, policy_model, value_model, policy_model)
     else:
-        model = load_model(checkpoint_path, model_type, device)
+        model = cast(ChessPolicyModel, load_model(checkpoint_path, model_type, device))
     print("Model loaded successfully!")
 
     # Create UI and controller

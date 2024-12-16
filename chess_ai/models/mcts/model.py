@@ -1,20 +1,16 @@
 from __future__ import annotations
+
 from math import sqrt
 
-from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
-from chess_ai.models.transformer.model import ChessTransformer
-from chess_ai.models.base import ChessPolicyModel, ChessValueModel
-
-from chess_ai.ui.base import GameController
-
-from chess_ai.data.preprocessing import GameEncoder, StandardEncoder
-from chess_ai.utils.chess_utils import decode_move_index
-
 import torch
-
+from chess import WHITE, Board, Color, Move, pgn
 from tqdm import tqdm
 
-from chess import BLACK, WHITE, Board, Color, Move, pgn
+from chess_ai.data.preprocessing import GameEncoder, StandardEncoder
+from chess_ai.models.base import ChessPolicyModel, ChessValueModel
+from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
+from chess_ai.ui.base import GameController
+from chess_ai.utils.chess_utils import decode_move_index
 
 
 class Node:

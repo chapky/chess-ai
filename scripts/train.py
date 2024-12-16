@@ -2,12 +2,86 @@ from pathlib import Path
 
 import click
 import torch
-import wandb
 
+import wandb
 from chess_ai.data.dataset import ChessPolicyDataset, ChessValueDataset
+from chess_ai.models.base import ChessPolicyModel, ChessValueModel
 from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
-from chess_ai.models.transformer.model import ChessTransformer
-from chess_ai.training.trainer import WandbCallback, train_policy_model, train_value_model
+from chess_ai.models.transformer.model import (
+    TransformerPolicyModel,
+    TransformerValueModel,
+)
+from chess_ai.training.trainer import (
+    WandbCallback,
+    train_policy_model,
+    train_value_model,
+)
+
+
+def create_value(
+    data_path: Path,
+    rating_range: str,
+    model_arch: str,
+    value_from_policy_path: Path | None = None,
+    from_checkpoint: Path | None = None,
+):
+    model: ChessValueModel
+
+    if value_from_policy_path is not None and from_checkpoint is not None:
+        raise ValueError(
+            "Cannot specify both from_checkpoint and value_from_policy_path"
+        )
+
+    dataset = ChessValueDataset.from_pgn(data_path, int(rating_range.split("-")[0]))
+
+    if model_arch == "transformer":
+        if value_from_policy_path:
+            model = TransformerValueModel.initialize_from_policy(
+                str(value_from_policy_path)
+            )
+        else:
+            model = TransformerValueModel()
+    else:
+        if value_from_policy_path:
+            model = ChessAIValue.initialize_from_smaller_model(
+                str(value_from_policy_path)
+            )
+        else:
+            model = ChessAIValue()
+
+    if from_checkpoint is not None:
+        checkpoint = torch.load(from_checkpoint)
+        if "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            model.load_state_dict(checkpoint)
+
+    return dataset, model
+
+
+def create_policy(
+    data_path: Path,
+    rating_range: str,
+    model_arch: str,
+    from_checkpoint: Path | None = None,
+):
+    model: ChessPolicyModel
+
+    dataset = ChessPolicyDataset.from_files(data_path, rating_range)
+
+    if model_arch == "cnn":
+        model = ChessAISmaller()
+    else:
+        model = TransformerPolicyModel()
+
+    if from_checkpoint is not None:
+        checkpoint = torch.load(from_checkpoint)
+        if "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            model.load_state_dict(checkpoint)
+
+    return dataset, model
 
 
 @click.command()
@@ -81,39 +155,17 @@ def train(
         },
     )
 
-    # Load data
-    if model_type == "value":
-        dataset = ChessValueDataset.from_pgn(data_path, int(rating_range.split("-")[0]))
-        if value_from_policy_path is not None:
-            if from_checkpoint is not None:
-                raise ValueError(
-                    "Cannot specify both from_checkpoint and value_from_policy_path"
-                )
-            model = ChessAIValue.initialize_from_smaller_model(
-                str(value_from_policy_path)
-            )
-        elif model_arch == "cnn":
-            model = ChessAIValue()
-        else:
-            print("Value model ddoes not support other architectures than cnn yet")
-    else:
-        dataset = ChessPolicyDataset.from_files(data_path, rating_range)
-        if model_arch == "cnn":
-            model = ChessAISmaller()
-        else:
-            model = ChessTransformer()
-    if from_checkpoint is not None:
-        checkpoint = torch.load(from_checkpoint)
-        if "model_state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["model_state_dict"])
-        else:
-            model.load_state_dict(checkpoint)
-
     # Train
     callback = WandbCallback()
+
+    # Load data
     if model_type == "value":
+        dataset, model_v = create_value(
+            data_path, rating_range, model_arch, value_from_policy_path, from_checkpoint
+        )
+
         train_value_model(
-            model=model,
+            model=model_v,
             dataset=dataset,
             batch_size=batch_size,
             epochs=epochs,
@@ -122,8 +174,12 @@ def train(
             callback=callback,
         )
     else:
+        dataset, model_p = create_policy(
+            data_path, rating_range, model_arch, from_checkpoint
+        )
+
         train_policy_model(
-            model=model,
+            model=model_p,
             dataset=dataset,
             batch_size=batch_size,
             epochs=epochs,

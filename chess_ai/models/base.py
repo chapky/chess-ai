@@ -1,8 +1,8 @@
 from typing import Protocol, runtime_checkable
 
 import torch
-from torch import Tensor
 from chess import Board, Color, Move
+from torch import Tensor
 
 from chess_ai.data.preprocessing import GameEncoder
 from chess_ai.utils.chess_utils import decode_move_index
@@ -47,10 +47,6 @@ class ChessPolicyModel(Protocol):
         verbose: bool = False,
     ) -> Move: ...
 
-    def __call__(self, state: Tensor, additional_params: Tensor) -> Tensor: ...
-
-    def eval(self): ...
-
 
 @runtime_checkable
 class ChessValueModel(Protocol):
@@ -83,49 +79,6 @@ class ChessValueModel(Protocol):
         ...
 
     def __call__(self, state: Tensor, additional_params: Tensor) -> Tensor: ...
-
-
-# Example implementation check function
-def check_policy_model_implementation(model) -> bool:
-    """Verify that a model properly implements the ChessPolicyModel protocol.
-
-    Args:
-        model: The model to check
-
-    Returns:
-        bool: True if the model implements the protocol correctly
-
-    Raises:
-        TypeError: If the model doesn't implement required methods
-    """
-    if not isinstance(model, ChessPolicyModel):
-        raise TypeError(
-            f"{model.__class__.__name__} doesn't implement the ChessPolicyModel protocol.\n"
-            "Required methods: forward(board_state, additional_params), "
-            "parameter_count()"
-        )
-    return True
-
-
-def check_value_model_implementation(model) -> bool:
-    """Verify that a model properly implements the ChessValueModel protocol.
-
-    Args:
-        model: The model to check
-
-    Returns:
-        bool: True if the model implements the protocol correctly
-
-    Raises:
-        TypeError: If the model doesn't implement required methods
-    """
-    if not isinstance(model, ChessValueModel):
-        raise TypeError(
-            f"{model.__class__.__name__} doesn't implement the ChessValueModel protocol.\n"
-            "Required methods: forward(board_state, additional_params), "
-            "parameter_count()"
-        )
-    return True
 
 
 def get_move(

@@ -1,13 +1,13 @@
-from chess import Board, Color, Move
 import torch
 import torch.nn as nn
+from chess import Board, Color, Move
 
 from chess_ai.data.preprocessing import GameEncoder
 from chess_ai.models.base import ChessPolicyModel, get_move
 
 
 class ChessTransformer(nn.Module):
-    """Transformer-based chess model."""
+    """Transformer-based chess embedding model."""
 
     def __init__(
         self,
@@ -15,7 +15,6 @@ class ChessTransformer(nn.Module):
         nhead: int = 4,
         num_layers: int = 4,
         dim_feedforward: int = 32,
-        dim_decoder: int = 512,
         dropout: float = 0.1,
     ) -> None:
         """Initialize transformer model.
@@ -25,7 +24,6 @@ class ChessTransformer(nn.Module):
             nhead: Number of attention heads
             num_layers: Number of transformer layers
             dim_feedforward: Dimension of feedforward network
-            dim_decoder: Dimension of decoder network
             dropout: Dropout rate
         """
         super().__init__()
@@ -50,20 +48,6 @@ class ChessTransformer(nn.Module):
             batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(decoder_layer, num_layers=num_layers)
-
-        # Output layers
-        self.move_predictor = nn.Sequential(
-            nn.Linear(d_model * 65, dim_decoder),  # 64 squares + additional features
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(dim_decoder, 4864),  # Total possible moves
-        )
-
-    def _create_square_mask(self, sz: int) -> torch.Tensor:
-        """Create mask for valid squares."""
-        mask = torch.triu(torch.ones(sz, sz)) == 1
-        mask = mask.float().masked_fill(mask == 0, float("-inf"))
-        return mask
 
     def forward(
         self,
@@ -111,14 +95,65 @@ class ChessTransformer(nn.Module):
             [square_features, additional_features], dim=1
         )  # (batch, 65, d_model)
 
-        # Create mask if not provided
-        if mask is None:
-            mask = self._create_square_mask(65).to(board_state.device)
-
         # Single transformer pass
         output = self.transformer(encoder_input, mask)
 
-        # Direct prediction from transformer output
+        return output
+
+
+class TransformerPolicyModel(nn.Module):
+    """A transformer-based chess policy model."""
+
+    def __init__(
+        self,
+        d_model: int = 16,
+        nhead: int = 4,
+        num_layers: int = 4,
+        dim_feedforward: int = 32,
+        dim_decoder: int = 4864,
+        dropout: float = 0.1,
+    ) -> None:
+        """Initialize transformer policy model.
+
+        Args:
+            d_model: Dimension of model embeddings
+            nhead: Number of attention heads
+            num_layers: Number of transformer layers
+            dim_feedforward: Dimension of feedforward network
+            dim_decoder: Dimension of decoder network
+            dropout: Dropout rate
+        """
+        super().__init__()
+        self.encoder = ChessTransformer(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        )
+
+        self.move_predictor = nn.Sequential(
+            nn.Linear(d_model * 65, dim_decoder),  # 64 squares + additional features
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_decoder, 4864),  # Total possible moves
+        )
+
+    def forward(
+        self, board_state: torch.Tensor, additional_params: torch.Tensor
+    ) -> torch.Tensor:
+        """Forward pass of the model.
+
+        Args:
+            board_state: Tensor of shape (batch_size, 12, 8, 8)
+            additional_params: Tensor of shape (batch_size, 3)
+
+        Returns:
+            Tensor of shape (batch_size, 4864) representing move probabilities
+        """
+        batch_size = board_state.size(0)
+        output = self.encoder(board_state, additional_params)
+
         output_flat = output.reshape(batch_size, -1)
         move_logits = self.move_predictor(output_flat)
 
@@ -137,3 +172,109 @@ class ChessTransformer(nn.Module):
         verbose: bool = False,
     ) -> Move:
         return get_move(self, encoder, board, device, color, verbose)
+
+
+class TransformerValueModel(nn.Module):
+    """A transformer-based chess value model."""
+
+    def __init__(
+        self,
+        d_model: int = 16,
+        nhead: int = 4,
+        num_layers: int = 4,
+        dim_feedforward: int = 32,
+        dim_decoder: int = 1,
+        dropout: float = 0.1,
+    ) -> None:
+        """Initialize transformer value model.
+
+        Args:
+            d_model: Dimension of model embeddings
+            nhead: Number of attention heads
+            num_layers: Number of transformer layers
+            dim_feedforward: Dimension of feedforward network
+            dim_decoder: Dimension of decoder network
+            dropout: Dropout rate
+        """
+        super().__init__()
+        self.encoder = ChessTransformer(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        )
+
+        self.value_predictor = nn.Sequential(
+            nn.Linear(d_model * 65, dim_decoder),  # 64 squares + additional features
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_decoder, 1),  # Single value output
+        )
+
+    def forward(
+        self, board_state: torch.Tensor, additional_params: torch.Tensor
+    ) -> torch.Tensor:
+        """Forward pass of the model.
+
+        Args:
+            board_state: Tensor of shape (batch_size, 12, 8, 8)
+            additional_params: Tensor of shape (batch_size, 3)
+
+        Returns:
+            Tensor of shape (batch_size, 1) representing value
+        """
+        batch_size = board_state.size(0)
+        output = self.encoder(board_state, additional_params)
+
+        output_flat = output.reshape(batch_size, -1)
+        value = self.value_predictor(output_flat)
+
+        return value
+
+    def parameter_count(self) -> int:
+        """Returns the total number of parameters in the model."""
+        return sum(p.numel() for p in self.parameters())
+
+    def get_move(
+        self: ChessPolicyModel,
+        encoder: GameEncoder,
+        board: Board,
+        device: torch.device,
+        color: Color,
+        verbose: bool = False,
+    ) -> Move:
+        return get_move(self, encoder, board, device, color, verbose)
+
+    @classmethod
+    def initialize_from_policy(
+        cls,
+        policy_model_path: str,
+        d_model: int = 16,
+        nhead: int = 4,
+        num_layers: int = 4,
+        dim_feedforward: int = 32,
+        dim_decoder: int = 1,
+        dropout: float = 0.1,
+    ) -> "TransformerValueModel":
+        """Initialize a value model from a policy model."""
+        value_model = cls(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dim_decoder=dim_decoder,
+            dropout=dropout,
+        )
+        policy_model = cls(
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dim_decoder=4864,
+            dropout=dropout,
+        )
+
+        policy_model.load_state_dict(torch.load(policy_model_path))
+        value_model.encoder = policy_model.encoder
+        return value_model

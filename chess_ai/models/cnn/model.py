@@ -1,13 +1,13 @@
 from __future__ import annotations
-from chess import Board, Color, Move
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from chess import Board, Color, Move
 from torch import Tensor
 
 from chess_ai.data.preprocessing import GameEncoder
-from chess_ai.models.base import ChessPolicyModel, ChessValueModel, get_move
-from chess_ai.utils.chess_utils import decode_move_index
+from chess_ai.models.base import ChessPolicyModel, get_move
 
 
 class ChessAISmaller(nn.Module):
@@ -213,3 +213,7 @@ class ChessAIValue(nn.Module):
         # The fc2 layer will remain randomly initialized
 
         return value_model
+
+    def parameter_count(self) -> int:
+        """Returns the total number of parameters in the model."""
+        return sum(p.numel() for p in self.parameters())

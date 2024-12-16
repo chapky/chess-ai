@@ -8,7 +8,7 @@ from tqdm import tqdm
 import wandb
 from chess_ai.data.dataset import ChessPolicyDataset
 from chess_ai.models.cnn.model import ChessAISmaller
-from chess_ai.models.transformer.model import ChessTransformer
+from chess_ai.models.transformer.model import TransformerPolicyModel
 from chess_ai.training.trainer import calculate_metrics
 from chess_ai.utils.chess_utils import decode_move_index
 
@@ -17,10 +17,12 @@ def load_model(
     checkpoint_path: Path, model_type: str, device: torch.device
 ) -> torch.nn.Module:
     """Load a model from a checkpoint file."""
+    model: torch.nn.Module
+
     if model_type == "cnn":
         model = ChessAISmaller()
     else:
-        model = ChessTransformer()
+        model = TransformerPolicyModel()
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if "model_state_dict" in checkpoint:

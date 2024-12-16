@@ -1,12 +1,18 @@
 from pathlib import Path
+from typing import cast
 
 import chess
 import click
 import torch
 
 from chess_ai.data.preprocessing import StandardEncoder
-from chess_ai.models.cnn.model import ChessAISmaller
-from chess_ai.models.transformer.model import ChessTransformer
+from chess_ai.models.base import ChessPolicyModel, ChessValueModel
+from chess_ai.models.cnn.model import ChessAISmaller, ChessAIValue
+from chess_ai.models.mcts.model import MCTS
+from chess_ai.models.transformer.model import (
+    TransformerPolicyModel,
+    TransformerValueModel,
+)
 from chess_ai.ui.base import GameController
 from chess_ai.ui.pygame_ui import PygameUI
 
@@ -16,18 +22,22 @@ from chess_ai.ui.pygame_ui import PygameUI
 
 def load_model(
     checkpoint_path: Path, model_type: str, device: torch.device
-) -> ChessAISmaller | ChessTransformer:
+) -> ChessPolicyModel | ChessValueModel:
     if model_type == "cnn":
         model = ChessAISmaller()
-    else:
-        model = ChessTransformer()
+    elif model_type == "transformer":
+        model = TransformerPolicyModel()
+    elif model_type == "value-cnn":
+        model = ChessAIValue()
+    elif model_type == "value-transformer":
+        model = TransformerValueModel()
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
-
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
         model.load_state_dict(checkpoint)
+    model = model.to(device)
 
     return model
 
@@ -51,16 +61,38 @@ def load_model(
     default="cnn",
     help="Model architecture to use",
 )
-def main(checkpoint_path: Path, player_color: str, model_type: str):
+@click.option(
+    "--value-checkpoint-path",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to value model checkpoint file (.pth). Automatically enables MCTS.",
+)
+def main(
+    checkpoint_path: Path,
+    player_color: str,
+    model_type: str,
+    value_checkpoint_path: Path | None = None,
+):
     """Play chess against a trained model using PyGame interface."""
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    model: ChessPolicyModel | MCTS
+
     # Load model
     print("Loading model...")
-    model = load_model(checkpoint_path, model_type, device)
-    model = model.to(device)
+    if value_checkpoint_path:
+        policy_model = cast(
+            ChessPolicyModel, load_model(checkpoint_path, model_type, device)
+        )
+        value_model = cast(
+            ChessValueModel,
+            load_model(value_checkpoint_path, "value-" + model_type, device),
+        )
+        model = MCTS(device, policy_model, value_model, policy_model)
+    else:
+        model = cast(ChessPolicyModel, load_model(checkpoint_path, model_type, device))
     print("Model loaded successfully!")
 
     # Create UI and controller

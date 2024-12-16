@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import chess
 import torch
 from chess import pgn
 
-from chess_ai.data.preprocessing import GameEncoder, StandardEncoder
-from chess_ai.utils.chess_utils import decode_move_index
+from chess_ai.data.preprocessing import GameEncoder
 from chess_ai.models.base import ChessPolicyModel
+
+if TYPE_CHECKING:
+    from chess_ai.models.mcts.model import MCTS
 
 
 @dataclass
@@ -65,7 +69,7 @@ class GameController:
     def __init__(
         self,
         ui: ChessUI,
-        model: ChessPolicyModel,
+        model: ChessPolicyModel | MCTS,
         encoder: GameEncoder,  # Using the encoder protocol from data/preprocessing.py
         device: torch.device,
         color: chess.Color = chess.WHITE,
@@ -105,6 +109,8 @@ class GameController:
                     return  # Game cancelled
             else:
                 move = self._get_model_move(game.board())
+                if move is None:
+                    return
 
             result = self._make_move(game, move)
             self.ui.show_move_result(result)
@@ -115,7 +121,7 @@ class GameController:
 
             game = game.next()
 
-    def _get_model_move(self, game: chess.Board) -> chess.Move:
+    def _get_model_move(self, game: chess.Board) -> chess.Move | None:
         """Get a move from the model.
 
         Args:
@@ -179,4 +185,3 @@ class GameController:
             winner = "White" if outcome.winner else "Black"
             return f"Game Over - {winner} wins by {outcome.termination.name}"
         return f"Game Over - Draw by {outcome.termination.name}"
-
