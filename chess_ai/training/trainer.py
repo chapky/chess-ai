@@ -5,13 +5,12 @@ from typing import Protocol
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import wandb
 from torch import Tensor
 from tqdm import tqdm
 
-from chess_ai.models.base import ChessPolicyModel, ChessValueModel
-
+import wandb
 from chess_ai.data.dataset import ChessPolicyDataset, ChessValueDataset
+from chess_ai.models.base import ChessPolicyModel, ChessValueModel
 
 logger = logging.getLogger(__name__)
 
@@ -219,14 +218,12 @@ def train_value_model(
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
-    for param in model.parameters():
-        param.requires_grad = False
-
-    model.fc2.weight.requires_grad = True
-    model.fc2.bias.requires_grad = True
+    model.freeze_all_but_head()
 
     optimizer = optim.Adam(
-        [{"params": model.fc2.parameters()}], lr=learning_rate, weight_decay=1e-5
+        [{"params": [p for p in model.parameters() if p.requires_grad]}],
+        lr=learning_rate,
+        weight_decay=1e-5,
     )
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     loss_fn = nn.MSELoss()

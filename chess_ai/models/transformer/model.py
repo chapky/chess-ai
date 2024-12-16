@@ -183,7 +183,7 @@ class TransformerValueModel(nn.Module):
         nhead: int = 4,
         num_layers: int = 4,
         dim_feedforward: int = 32,
-        dim_decoder: int = 1,
+        dim_decoder: int = 512,
         dropout: float = 0.1,
     ) -> None:
         """Initialize transformer value model.
@@ -254,7 +254,7 @@ class TransformerValueModel(nn.Module):
         nhead: int = 4,
         num_layers: int = 4,
         dim_feedforward: int = 32,
-        dim_decoder: int = 1,
+        dim_decoder: int = 512,
         dropout: float = 0.1,
     ) -> "TransformerValueModel":
         """Initialize a value model from a policy model."""
@@ -278,3 +278,11 @@ class TransformerValueModel(nn.Module):
         policy_model.load_state_dict(torch.load(policy_model_path))
         value_model.encoder = policy_model.encoder
         return value_model
+
+    def freeze_all_but_head(self):
+        """Freezes all layers except the value decoder."""
+        for param in self.parameters():
+            param.requires_grad = False
+
+        for param in self.value_predictor.parameters():
+            param.requires_grad = True

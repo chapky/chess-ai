@@ -80,6 +80,8 @@ class ChessValueModel(Protocol):
 
     def __call__(self, state: Tensor, additional_params: Tensor) -> Tensor: ...
 
+    def freeze_all_but_head(self): ...
+
 
 def get_move(
     self: ChessPolicyModel,

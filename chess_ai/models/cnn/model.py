@@ -217,3 +217,11 @@ class ChessAIValue(nn.Module):
     def parameter_count(self) -> int:
         """Returns the total number of parameters in the model."""
         return sum(p.numel() for p in self.parameters())
+
+    def freeze_all_but_head(self):
+        """Freezes all layers except the last fully connected layer."""
+        for param in self.parameters():
+            param.requires_grad = False
+
+        self.fc2.weight.requires_grad = True
+        self.fc2.bias.requires_grad = True
