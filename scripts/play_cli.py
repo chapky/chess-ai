@@ -64,11 +64,18 @@ def load_model(
     default=None,
     help="Path to value model checkpoint file (.pth). Automatically enables MCTS.",
 )
+@click.option(
+    "--value-model-type",
+    type=click.Choice(["cnn", "transformer"]),
+    default=None,
+    help="Value model architecture to use; defaults to the same as the policy model.",
+)
 def main(
     checkpoint_path: Path,
     player_color: str,
     model_type: str,
     value_checkpoint_path: Path | None = None,
+    value_model_type: str | None = None,
 ):
     """Play chess against a trained model via command line interface."""
     # Setup device
@@ -85,7 +92,11 @@ def main(
         )
         value_model = cast(
             ChessValueModel,
-            load_model(value_checkpoint_path, "value-" + model_type, device),
+            load_model(
+                value_checkpoint_path,
+                "value-" + (value_model_type or model_type),
+                device,
+            ),
         )
         model = MCTS(device, policy_model, value_model, policy_model)
     else:
