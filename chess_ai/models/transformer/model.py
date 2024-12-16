@@ -266,7 +266,7 @@ class TransformerValueModel(nn.Module):
             dim_decoder=dim_decoder,
             dropout=dropout,
         )
-        policy_model = cls(
+        policy_model = TransformerPolicyModel(
             d_model=d_model,
             nhead=nhead,
             num_layers=num_layers,
@@ -275,7 +275,11 @@ class TransformerValueModel(nn.Module):
             dropout=dropout,
         )
 
-        policy_model.load_state_dict(torch.load(policy_model_path))
+        state = torch.load(policy_model_path)
+        if "model_state_dict" in state:
+            policy_model.load_state_dict(state["model_state_dict"])
+        else:
+            policy_model.load_state_dict(state)
         value_model.encoder = policy_model.encoder
         return value_model
 
