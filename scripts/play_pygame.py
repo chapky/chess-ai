@@ -73,12 +73,26 @@ def load_model(
     default=None,
     help="Value model architecture to use; defaults to the same as the policy model.",
 )
+@click.option(
+    "--rollout-checkpoint-path",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to rollout model checkpoint file (.pth). Automatically enables MCTS.",
+)
+@click.option(
+    "--rollout-model-type",
+    type=click.Choice(["cnn", "transformer"]),
+    default=None,
+    help="Rollout model architecture to use; defaults to the same as the policy model.",
+)
 def main(
     checkpoint_path: Path,
     player_color: str,
     model_type: str,
     value_checkpoint_path: Path | None = None,
     value_model_type: str | None = None,
+    rollout_checkpoint_path: Path | None = None,
+    rollout_model_type: str | None = None,
 ):
     """Play chess against a trained model using PyGame interface."""
     # Setup device
@@ -101,7 +115,18 @@ def main(
                 device,
             ),
         )
-        model = MCTS(device, policy_model, value_model, policy_model)
+        if rollout_checkpoint_path:
+            rollout_model = cast(
+                ChessPolicyModel,
+                load_model(
+                    rollout_checkpoint_path,
+                    rollout_model_type or model_type,
+                    device,
+                ),
+            )
+        else:
+            rollout_model = policy_model
+        model = MCTS(device, policy_model, value_model, rollout_model)
     else:
         model = cast(ChessPolicyModel, load_model(checkpoint_path, model_type, device))
     print("Model loaded successfully!")
